@@ -1929,3 +1929,40 @@ test('GH-877 content-type should be case insensitive', function (t) {
     });
     client.end();
 });
+
+
+test('GH-667 emit error event for generic Errors', function (t) {
+
+    var count = 0;
+
+    SERVER.get('/1', function (req, res, next) {
+        return next(new Error('foobar'));
+    });
+
+    SERVER.get('/2', function (req, res, next) {
+        return next(new errors.NotFoundError('foobar'));
+    });
+
+    SERVER.get('/3', function (req, res, next) {
+        SERVER.on('NotFound', function (req2, res2, err, cb) {
+            t.ok(err);
+            t.equal(err instanceof errors.NotFoundError, true);
+            t.equal(count, 2);
+            t.end();
+            return cb();
+        });
+        return next(new errors.NotFoundError('foobar'));
+    });
+
+    SERVER.on('error', function (req, res, err, cb) {
+        count++;
+        t.ok(err);
+        t.equal(err instanceof Error, true);
+        return cb();
+    });
+
+    function noop() {}
+    CLIENT.get('/1', noop);
+    CLIENT.get('/2', noop);
+    CLIENT.get('/3', noop);
+});
